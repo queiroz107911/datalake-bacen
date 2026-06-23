@@ -1,0 +1,28 @@
+[project]
+name = "datalake-bacen"
+version = "0.1.0"
+description = "Pipeline serverless na AWS que ingere dados do BACEN (SGS) em arquitetura Medallion."
+readme = "README.md"
+# Fixamos 3.11 para bater com o runtime da Lambda e do Glue na AWS.
+requires-python = ">=3.11,<3.12"
+
+# O projeto em si não tem dependências de runtime instaladas localmente:
+# na nuvem, boto3 já vem na Lambda e o awswrangler é instalado pelo Glue Job.
+dependencies = []
+
+# Dependências de desenvolvimento/teste (gerenciadas pelo uv).
+# Instale com:  uv sync
+[dependency-groups]
+dev = [
+    "pandas>=2.0",        # transformações da Silver (funções testáveis)
+    "pyarrow>=14.0",      # engine Parquet usada pelo pandas
+    "boto3>=1.34",        # SDK da AWS (usado pelo handler da Lambda)
+    "moto[s3]>=5.0",      # mock do S3 em memória nos testes de integração
+    "pytest>=8.0",        # framework de testes
+    "python-dotenv>=1.0", # carregar .env em execução local
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# -v mostra cada teste; -ra mostra resumo de falhas/skips no final.
+addopts = "-v -ra"

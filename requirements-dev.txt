@@ -1,0 +1,16 @@
+# Dependências de DESENVOLVIMENTO e TESTE (não vão para a nuvem).
+#
+# CAMINHO PRINCIPAL: este projeto usa `uv`. Prefira:
+#     uv sync          # instala tudo a partir do pyproject.toml
+#     uv run pytest    # roda os testes
+#
+# Este arquivo é um espelho compatível com pip, mantido apenas para quem não usa
+# uv. Para instalar com pip:
+#     pip install -r requirements-dev.txt
+
+pandas>=2.0          # transformações da camada Silver (funções testáveis)
+pyarrow>=14.0        # engine Parquet usada pelo pandas/awswrangler
+boto3>=1.34          # SDK da AWS (usado pelo handler da Lambda)
+moto[s3]>=5.0        # mock do S3 em memória para os testes de integração
+pytest>=8.0          # framework de testes
+python-dotenv>=1.0   # carregar variáveis de ambiente a partir de .env (local)

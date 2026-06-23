@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Variáveis de ambiente (segredos) — nunca versionar
+.env
+
+# Terraform
+infra/.terraform/
+infra/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+infra/build/
+crash.log
+
+# Artefatos de build da Lambda
+build/
+
+# Saídas de invocação manual (aws lambda invoke / aws glue) — lixo, não versionar
+output.json
+response.json
+
+# Sistema
+.DS_Store
+
+# Configuração local do Claude Code (não compartilhar)
+.claude/
+
+# Documentação pessoal de estudo — não versionar (uso interno de aprendizado)
+CLAUDE.md
+GUIA_COMPLETO.md

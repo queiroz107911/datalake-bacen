@@ -1,0 +1,9 @@
+# Dependências de runtime da Lambda de ingestão.
+#
+# A função usa apenas a biblioteca padrão do Python (urllib, json, logging) para
+# a chamada HTTP, e boto3 para o S3/Glue. O boto3 já vem PRÉ-INSTALADO no runtime
+# da AWS Lambda, então NÃO precisa ser empacotado no zip de deploy.
+#
+# Resultado: o pacote de deploy da Lambda é apenas o handler.py — sem
+# dependências externas para instalar. Por isso este arquivo está
+# intencionalmente vazio (mantido apenas para documentar a decisão).
