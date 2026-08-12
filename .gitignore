@@ -33,3 +33,6 @@ response.json
 # Documentação pessoal de estudo — não versionar (uso interno de aprendizado)
 CLAUDE.md
 GUIA_COMPLETO.md
+
+# arquivo de variáveis de ambiente para o terraform
+terraform.tfvars 

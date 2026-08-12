@@ -52,11 +52,16 @@ variable "schedule_expression" {
     cron(Minutos Horas Dia-do-mês Mês Dia-da-semana Ano)
   EOT
   type        = string
-  default     = "cron(0 9 * * ? *)"
+  default     = "cron(0 18 20 * ? *)"
 }
 
 variable "glue_python_version" {
   description = "Versão do Python para o Glue Job (Python Shell)."
   type        = string
   default     = "3.9"
+}
+
+variable "alert_email" {
+  description = "E-mail para receber notificações de falha no pipeline (Lambda/Glue)."
+  type        = string
 }
