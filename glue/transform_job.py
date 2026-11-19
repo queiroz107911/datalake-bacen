@@ -1,32 +1,19 @@
-"""Glue Job de transformação (camada Bronze -> Silver) do DataLake BACEN.
+"""Glue Job de transformação (camada Bronze -> Silver) do DataLake BACEN
 
-Este script é executado como um AWS Glue Job do tipo **Python Shell** (não Spark).
-Por quê Python Shell e não Spark? As séries do SGS são pequenas (centenas a
-poucos milhares de pontos). Spark seria desperdício de recurso e complexidade.
-"A tecnologia é consequência do problema, não o ponto de partida."
+Este script é executado como um AWS Glue Job do tipo **Python Shell** (não Spark)
+Porque as séries do SGS são pequenas, Spark seria desperdício de recurso e complexidade
 
 O que o job faz:
 
-1. Lê todos os JSONs brutos da camada Bronze no S3.
-2. Limpa e tipa os dados (datas e valores).
-3. Escreve em Parquet particionado por ano/mês na camada Silver no S3.
+1. Lê todos os JSONs brutos da camada Bronze no S3
+2. Limpa e tipa os dados (datas e valores)
+3. Escreve em Parquet particionado por ano/mês na camada Silver no S3
 
-Organização do código:
-
-- As funções de transformação no topo do módulo são **puras** (só dependem de
-  pandas). Não tocam em AWS. Isso as torna fáceis de testar com pytest, sem
-  precisar de Spark, credenciais ou rede.
-- Toda a parte específica de AWS/Glue (ler argumentos, S3, etc.) fica dentro de
-  `main()` e do bloco `if __name__ == "__main__"`. Os imports do `awsglue` e
-  `awswrangler` também ficam lá dentro — assim, importar este módulo nos testes
-  NÃO exige essas bibliotecas (que só existem no ambiente do Glue).
 """
 
 from __future__ import annotations
-
 import logging
 from typing import Any
-
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -39,19 +26,7 @@ logger.setLevel(logging.INFO)
 
 
 def parse_records(registros: list[dict[str, Any]], codigo: str) -> pd.DataFrame:
-    """Converte a lista de registros brutos da API em um DataFrame tipado.
-
-    A API do SGS retorna registros no formato:
-        [{"data": "01/06/2026", "valor": "14.90"}, ...]
-
-    Args:
-        registros: lista de dicionários crus vinda do JSON da Bronze.
-        codigo: código da série (vira a coluna `serie_codigo`).
-
-    Returns:
-        DataFrame com as colunas: data (datetime64), valor (float),
-        serie_codigo (str). Linhas com data ou valor inválidos são removidas.
-    """
+    
     if not registros:
         # Retorna um DataFrame vazio com o schema esperado, em vez de quebrar.
         # Isso mantém o contrato da função estável para quem consome.
@@ -72,33 +47,21 @@ def parse_records(registros: list[dict[str, Any]], codigo: str) -> pd.DataFrame:
 
 
 def _converter_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Converte a coluna `data` (string "DD/MM/AAAA") para datetime64.
-
-    Usa `errors="coerce"`: datas inválidas viram NaT em vez de estourar exceção.
-    A remoção dos NaT acontece depois, em `_remover_invalidos`.
-    """
+    
     df = df.copy()
     df["data"] = pd.to_datetime(df["data"], format="%d/%m/%Y", errors="coerce")
     return df
 
 
 def _converter_valor(df: pd.DataFrame) -> pd.DataFrame:
-    """Converte a coluna `valor` (string) para float.
-
-    A API usa ponto como separador decimal (ex.: "14.90"), então
-    `pd.to_numeric` resolve direto. `errors="coerce"` transforma valores
-    inválidos em NaN.
-    """
+    
     df = df.copy()
     df["valor"] = pd.to_numeric(df["valor"], errors="coerce")
     return df
 
 
 def _remover_invalidos(df: pd.DataFrame) -> pd.DataFrame:
-    """Remove linhas com `data` (NaT) ou `valor` (NaN) inválidos.
 
-    Limpeza típica da camada Silver: garantir que o dado tipado é confiável.
-    """
     antes = len(df)
     df = df.dropna(subset=["data", "valor"])
     removidas = antes - len(df)
@@ -108,39 +71,26 @@ def _remover_invalidos(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def adicionar_particoes(df: pd.DataFrame) -> pd.DataFrame:
-    """Adiciona as colunas de partição `ano` e `mes` a partir da coluna `data`.
-
-    Particionar por ano/mês no S3 deixa as consultas do Athena mais baratas e
-    rápidas: o Athena lê só as partições necessárias (partition pruning), em vez
-    de varrer o dataset inteiro.
-
-    Args:
-        df: DataFrame com a coluna `data` já em datetime64.
-
-    Returns:
-        DataFrame com as colunas extras `ano` (int) e `mes` (int).
-    """
+    
     df = df.copy()
     df["ano"] = df["data"].dt.year.astype("int64")
     df["mes"] = df["data"].dt.month.astype("int64")
     return df
 
 
+def manter_ingestao_recente(df: pd.DataFrame) -> pd.DataFrame:
+        """Mantém, para cada data, só o registro da ingestão mais recente"""
+
+        if "ingestion_date" in df.columns:
+            df = df.sort_values(by="ingestion_date").drop_duplicates(subset=["data"], keep="last")
+
+        return df
+
+
 def transformar(registros: list[dict[str, Any]], codigo: str) -> pd.DataFrame:
-    """Pipeline de transformação completo Bronze -> Silver para uma série.
-
-    Junta as etapas: parse/tipagem -> remoção de inválidos -> partições.
-    Esta é a função pública principal, usada tanto pelo Glue Job quanto pelos
-    testes unitários.
-
-    Args:
-        registros: registros brutos da Bronze.
-        codigo: código da série.
-
-    Returns:
-        DataFrame Silver, limpo, tipado e com colunas de partição.
-    """
+    
     df = parse_records(registros, codigo)
+    df = manter_ingestao_recente(df)
     df = adicionar_particoes(df)
     return df
 
@@ -149,19 +99,18 @@ def transformar(registros: list[dict[str, Any]], codigo: str) -> pd.DataFrame:
 # Parte específica do AWS Glue (não é exercitada nos testes unitários)
 # ---------------------------------------------------------------------------
 
+def extrair_ingestion_date(caminho: str) -> str:
+    import re
+
+    match = re.search(r"ingestion_date=([^/]+)/", caminho)
+    if match is None:
+        raise ValueError(f"ingestion_date não encontrado no caminho: {caminho}")
+    
+    return match.group(1)
+
 
 def _ler_bronze(s3_path_bronze: str) -> dict[str, list[dict[str, Any]]]:
-    """Lê todos os JSONs da Bronze e agrupa os registros por código de série.
-
-    A chave do S3 da Bronze segue o padrão:
-        .../serie_codigo=12/ingestion_date=.../dados.json
-
-    Args:
-        s3_path_bronze: prefixo S3 da camada Bronze (ex.: s3://bucket/sgs/).
-
-    Returns:
-        Dicionário {codigo_serie: [registros...]} agregando todas as ingestões.
-    """
+    
     import json
     import re
 
@@ -176,8 +125,14 @@ def _ler_bronze(s3_path_bronze: str) -> dict[str, list[dict[str, Any]]]:
         match = re.search(r"serie_codigo=([^/]+)/", caminho)
         codigo = match.group(1) if match else "desconhecido"
 
+        data_ingestao = extrair_ingestion_date(caminho)
+
         bytes_json = _baixar_objeto(caminho)
         registros = json.loads(bytes_json.decode("utf-8"))
+
+        for registro in registros:
+            registro["ingestion_date"] = data_ingestao
+            
         por_serie.setdefault(codigo, []).extend(registros)
 
     return por_serie
@@ -195,11 +150,7 @@ def _baixar_objeto(s3_uri: str) -> bytes:
 
 
 def _escrever_silver(df: pd.DataFrame, s3_path_silver: str) -> None:
-    """Escreve o DataFrame Silver em Parquet particionado por ano/mês no S3.
-
-    Usa `awswrangler` com `dataset=True` e `mode="overwrite_partitions"`:
-    reprocessar uma partição substitui só ela, sem duplicar dados.
-    """
+    
     import awswrangler as wr
 
     if df.empty:
