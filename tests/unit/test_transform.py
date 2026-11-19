@@ -17,7 +17,7 @@ def registros_validos() -> list[dict]:
     return [
         {"data": "01/01/2026", "valor": "11.25"},
         {"data": "01/02/2026", "valor": "11.50"},
-        {"data": "15/03/2026", "valor": "12.00"},
+        {"data": "15/03/2026", "valor": "12.00"}
     ]
 
 
@@ -80,3 +80,35 @@ def test_transformar_pipeline_completo(registros_validos):
     assert len(df) == 3
     assert df["ano"].tolist() == [2026, 2026, 2026]
     assert df["mes"].tolist() == [1, 2, 3]
+
+
+def test_mantem_ingestao_recente():
+    """Cada data deve aparecer uma vez, com o valor da ingestão mais recente"""
+    registros = [
+        {"data": "01/01/2026", "valor": "10.00", "ingestion_date": "2026-01-03"},
+        {"data": "02/01/2026", "valor": "11.00", "ingestion_date": "2026-01-04"},
+        {"data": "03/01/2026", "valor": "12.00", "ingestion_date": "2026-01-05"},
+        {"data": "04/01/2026", "valor": "13.00", "ingestion_date": "2026-01-06"},
+        {"data": "03/01/2026", "valor": "12.50", "ingestion_date": "2026-01-07"},
+    ]
+    df = tj.transformar(registros, codigo="433")
+    
+    assert len(df) == 4
+    
+    valor_dia_3 = df[df["data"] == "2026-01-03"]["valor"].iloc[0] 
+    assert valor_dia_3 == 12.50  # O valor mais recente para a data 03/01/2026 deve ser mantido
+    
+
+def test_ingestion_date():
+
+    caminho = "s3://bucket/sgs/serie_codigo=12/ingestion_date=2026-06-23/dados.json"
+
+    resultado = tj.extrair_ingestion_date(caminho)
+    assert resultado == "2026-06-23"
+
+
+def test_extrair_ingestion_date_sem_data_gera_erro():
+    caminho = "s3://bucket/sgs/serie_codigo=12/dados.json"   # sem ingestion_date
+
+    with pytest.raises(ValueError):
+        tj.extrair_ingestion_date(caminho)
