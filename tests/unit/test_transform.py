@@ -112,3 +112,24 @@ def test_extrair_ingestion_date_sem_data_gera_erro():
 
     with pytest.raises(ValueError):
         tj.extrair_ingestion_date(caminho)
+
+
+def test_carimbar_ingestion_date():
+    registros = [{"data": "02/01/2026", "valor": "10.5"},
+                  {"data": "02/02/2026", "valor": "12.5"},
+                  {"data": "05/03/2026", "valor": "11"}]
+    data_ingestao = "2026-01-01"
+
+    resultado = tj.carimbar_ingestion_date(registros, data_ingestao)
+
+    assert len(resultado) == len(registros)
+
+    assert resultado
+
+    assert all(r["ingestion_date"] == data_ingestao for r in resultado)
+
+    assert resultado[0]["data"] == "02/01/2026"
+
+    assert resultado[1]["valor"] == "12.5"
+
+    assert "ingestion_date" not in registros[0]  # registros originais não devem ser alterados

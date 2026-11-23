@@ -87,6 +87,15 @@ def manter_ingestao_recente(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
 
+def carimbar_ingestion_date(registros, data_ingestao):
+    resultado = []
+    for registro in registros:
+        novo = registro.copy()
+        novo["ingestion_date"] = data_ingestao
+        resultado.append(novo)
+    return resultado
+
+
 def transformar(registros: list[dict[str, Any]], codigo: str) -> pd.DataFrame:
     
     df = parse_records(registros, codigo)
@@ -110,7 +119,6 @@ def extrair_ingestion_date(caminho: str) -> str:
 
 
 def _ler_bronze(s3_path_bronze: str) -> dict[str, list[dict[str, Any]]]:
-    
     import json
     import re
 
@@ -130,11 +138,8 @@ def _ler_bronze(s3_path_bronze: str) -> dict[str, list[dict[str, Any]]]:
         bytes_json = _baixar_objeto(caminho)
         registros = json.loads(bytes_json.decode("utf-8"))
 
-        for registro in registros:
-            registro["ingestion_date"] = data_ingestao
-            
-        por_serie.setdefault(codigo, []).extend(registros)
-
+        carimbados = carimbar_ingestion_date(registros, data_ingestao)
+        por_serie.setdefault(codigo, []).extend(carimbados)
     return por_serie
 
 
