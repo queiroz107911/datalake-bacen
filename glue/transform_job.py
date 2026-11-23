@@ -87,6 +87,15 @@ def manter_ingestao_recente(df: pd.DataFrame) -> pd.DataFrame:
         return df
 
 
+def carimbar_ingestion_date(registros, data_ingestao):
+    resultado = []
+    for registro in registros:
+        novo = registro.copy()
+        novo["ingestion_date"] = data_ingestao
+        resultado.append(novo)
+    return resultado
+
+
 def transformar(registros: list[dict[str, Any]], codigo: str) -> pd.DataFrame:
     
     df = parse_records(registros, codigo)
